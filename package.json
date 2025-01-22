@@ -14,7 +14,7 @@
   "author": "Rackspace Technology",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rackspace/maybe-ts.git"
+    "url": "git+https://github.com/rackspace/maybe-ts.git"
   },
   "bugs": {
     "url": "https://github.com/rackspace/maybe-ts/issues"

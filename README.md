@@ -12,7 +12,7 @@ how that particular function behaves and adapt to that if they want to handle
 the missing value.
 
 Finally, throwing Errors in TypeScript can be expensive, as a stack trace must be
-generated and cross-referenced to the .map files. These stack traces to your
+generated and cross-referenced to the `.map` files. These stack traces to your
 TypeScript source are immensely useful to trace actual errors, but are wasted
 processing when ignored.
 
