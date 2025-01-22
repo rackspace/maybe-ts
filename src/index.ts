@@ -2,7 +2,8 @@
 export type Maybe<T> = MaybeValue<T> | MaybeNone;
 /** A Promise to a Maybe */
 export type PromiseMaybe<T> = Promise<Maybe<T>>;
-type MaybeValueType<T extends Maybe<any>> = T extends MaybeValue<infer U> ? U : never;
+type MaybeValueType<T extends Maybe<any>> =
+  T extends MaybeValue<infer U> ? U : never;
 type MaybeValueTypes<T extends Maybe<any>[]> = {
   [key in keyof T]: T[key] extends Maybe<any> ? MaybeValueType<T[key]> : never;
 };
@@ -17,7 +18,8 @@ export function isMaybe<T>(value: unknown): value is Maybe<T> {
 /**
  * Base interface for both MaybeValue and MaybeNone.
  */
-interface BaseMaybe<T> extends Iterable<T extends Iterable<infer U> ? U : never> {
+interface BaseMaybe<T>
+  extends Iterable<T extends Iterable<infer U> ? U : never> {
   readonly isValue: boolean;
   readonly isNone: boolean;
 
@@ -238,7 +240,9 @@ function toString(val: unknown): string {
   if (value === "[object Object]") {
     try {
       value = JSON.stringify(val);
-    } catch {}
+    } catch {
+      /* use unstringified value */
+    }
   }
   return value;
 }
@@ -317,7 +321,9 @@ export namespace Maybe {
    * Parse a set of Maybes, returning an array of all `Some` values.
    * Short circuits with the first `None` found, if any
    */
-  export function allOrNone<T extends Maybe<any>[]>(...options: T): Maybe<MaybeValueTypes<T>> {
+  export function allOrNone<T extends Maybe<any>[]>(
+    ...options: T
+  ): Maybe<MaybeValueTypes<T>> {
     const someOption = [];
     for (const option of options) {
       if (option.isValue) {
@@ -335,14 +341,18 @@ export namespace Maybe {
    * filtering out any `None`s found, if any.
    */
   export function allValues<T>(...options: Maybe<T>[]): T[] {
-    return options.filter((option) => option.isValue).map((maybe) => maybe.unwrap());
+    return options
+      .filter((option) => option.isValue)
+      .map((maybe) => maybe.unwrap());
   }
 
   /**
    * Parse a set of Maybes, short-circuits when an input value is `Some`.
    * If no `Some` is found, returns `None`.
    */
-  export function any<T extends Maybe<any>[]>(...options: T): Maybe<MaybeValueTypes<T>[number]> {
+  export function any<T extends Maybe<any>[]>(
+    ...options: T
+  ): Maybe<MaybeValueTypes<T>[number]> {
     // short-circuits
     for (const option of options) {
       if (option.isValue) {

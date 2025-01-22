@@ -20,8 +20,8 @@ describe("maybe", () => {
       expect(
         Maybe.None.mapOrElse(
           () => "orElse",
-          () => true
-        )
+          () => true,
+        ),
       ).toEqual("orElse");
       expect(Maybe.None.andThen("ignored")).toBe(Maybe.None);
       expect(Maybe.None.toString()).toEqual("None");
@@ -29,7 +29,6 @@ describe("maybe", () => {
 
     test("iterator", () => {
       let index = 0;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for (const _item of Maybe.None) {
         index++;
       }
@@ -42,7 +41,9 @@ describe("maybe", () => {
       const uut = Maybe.notFound("one", "two");
       expect(isMaybe(uut)).toBeTruthy();
       expect(uut.isNone).toBe(true);
-      expect(() => uut.unwrap()).toThrow(new NotFoundError("NotFound: one two"));
+      expect(() => uut.unwrap()).toThrow(
+        new NotFoundError("NotFound: one two"),
+      );
     });
   });
 
@@ -80,7 +81,7 @@ describe("maybe", () => {
         (value) => {
           expect(value).toBe(content);
           return "mapped";
-        }
+        },
       );
       expect(mapOrElseValue).toBe("mapped");
 
@@ -104,7 +105,6 @@ describe("maybe", () => {
 
     test("iterator on Empty", () => {
       let index = 0;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for (const _value of Maybe.Empty) {
         index++;
       }
@@ -131,7 +131,11 @@ describe("maybe", () => {
 
   describe("allOrNone", () => {
     test("with a None", () => {
-      const maybe = Maybe.allOrNone(Maybe.Empty, Maybe.withValue(3), Maybe.None);
+      const maybe = Maybe.allOrNone(
+        Maybe.Empty,
+        Maybe.withValue(3),
+        Maybe.None,
+      );
       expect(maybe).toBe(Maybe.None);
     });
 
@@ -143,7 +147,11 @@ describe("maybe", () => {
 
   describe("allValues", () => {
     test("with a None", () => {
-      const maybe = Maybe.allValues(Maybe.withValue(1), Maybe.None, Maybe.withValue(3));
+      const maybe = Maybe.allValues(
+        Maybe.withValue(1),
+        Maybe.None,
+        Maybe.withValue(3),
+      );
       expect(maybe).toEqual([1, 3]);
     });
 
