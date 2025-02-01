@@ -27,7 +27,7 @@ It is now the caller's choice. There are many other helper functions too, such a
 to unwrap with a default value to return in place of throwing if `isNone`.
 
 This is not an "anti-throw" utility like Rust's `Result` type is.
-JavaScript likes to throw `Error` types, but in other languages we call these _exceptions_.
+In JavaScript we like to throw `Error` types, but in other languages we call these _exceptions_.
 **Throwing is still good for _exceptional_ cases. `Maybe` is for "normal" control flows.**
 
 Here's a nice introduction to the concept:
@@ -35,12 +35,19 @@ Here's a nice introduction to the concept:
 
 ## Origin and Alternatives
 
-This implementation is based on `Option` from https://github.com/vultix/ts-results, which adheres to
-the Rust API. This library has more natual word choices, Promise support, and other enhancements.
+This implementation is based on `Option` from [ts-results](https://github.com/vultix/ts-results),
+which adheres to the Rust API. 
+This library has more natual word choices, Promise support, and other enhancements.
 
-There are many other libraries that do this same thing - just search NPM for "maybe".
+There are many other libraries that do this same thing - just
+[search NPM for "maybe"](https://www.npmjs.com/search?q=maybe).
 It is up to you to decide which option is best for your project.
+
+**The goal of this "maybe" is to be featureful, safe, and easy to understand without 
+a study of functional programming.**
 
 ## API Use
 
 [API Documentation](https://www.jsdocs.io/package/maybe-ts)
+
+See the [unit test suite](src/index.spec.ts) for usage examples.
