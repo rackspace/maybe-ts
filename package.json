@@ -1,7 +1,7 @@
 {
-  "name": "maybe-ts",
-  "version": "1.0.0",
-  "description": "Safe handling of null and undefined in Typescript and Javascript",
+  "name": "maybe-result",
+  "version": "0.1.0",
+  "description": "Safe function return handling without null and undefined in Typescript and Javascript",
   "keywords": [
     "maybe",
     "typescript",
@@ -15,12 +15,12 @@
   "author": "Rackspace Technology",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rackspace/maybe-ts.git"
+    "url": "git+https://github.com/rackspace/maybe.git"
   },
   "bugs": {
-    "url": "https://github.com/rackspace/maybe-ts/issues"
+    "url": "https://github.com/rackspace/maybe/issues"
   },
-  "homepage": "https://github.com/rackspace/maybe-ts",
+  "homepage": "https://github.com/rackspace/maybe",
   "contributors": [
     "Adam Fanello <adam.fanello@rackspace.com>"
   ],
