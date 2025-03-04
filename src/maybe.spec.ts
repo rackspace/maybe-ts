@@ -1,20 +1,24 @@
-import { isMaybe, Maybe, NotFoundError } from "./index";
+import { Maybe, NotFoundError } from "./maybe";
+import { Result } from "./result";
+import isMaybe = Maybe.isMaybe;
 
-describe("maybe", () => {
+describe("Maybe", () => {
   describe("with None", () => {
     test("factory asNone", () => {
       expect(Maybe.asNone()).toBe(Maybe.None);
     });
 
-    test("functions", () => {
+    test("has basic uses", () => {
       expect(Maybe.None.isNone).toBe(true);
       expect(Maybe.None.isValue).toBe(false);
+
       expect(() => Maybe.None.unwrap()).toThrow();
       expect(Maybe.None.unwrapOr("hello")).toEqual("hello");
       expect(() => Maybe.None.unwrapOrThrow("hello")).toThrow();
       const myError = new Error("mine");
       expect(() => Maybe.None.unwrapOrThrow(myError)).toThrow(myError);
       expect(Maybe.None.unwrapOrNull()).toBeNull();
+
       expect(Maybe.None.map(() => true)).toBe(Maybe.None);
       expect(Maybe.None.mapOr("orThis", () => true)).toEqual("orThis");
       expect(
@@ -24,10 +28,17 @@ describe("maybe", () => {
         ),
       ).toEqual("orElse");
       expect(Maybe.None.andThen("ignored")).toBe(Maybe.None);
+
       expect(Maybe.None.toString()).toEqual("None");
+      const resultError = new Error("mine");
+
+      expect(Maybe.None.toResult(resultError)).toEqual({
+        ...Result.error(resultError),
+        _stack: expect.any(String),
+      });
     });
 
-    test("iterator", () => {
+    test("has empty iterator", () => {
       let index = 0;
       for (const _item of Maybe.None) {
         index++;
@@ -50,14 +61,16 @@ describe("maybe", () => {
   describe("with Some value", () => {
     test("factory withValue / isMaybe", () => {
       const uut = Maybe.withValue("hi");
-      expect(isMaybe(uut)).toBeTruthy();
+      expect(Maybe.isMaybe(uut)).toBeTruthy();
     });
 
-    test("functions", () => {
+    test("has basic uses", () => {
       const content = { id: "utest" };
       const uut = Maybe.withValue(content);
+
       expect(uut.isNone).toBe(false);
       expect(uut.isValue).toBe(true);
+
       expect(uut.unwrap()).toBe(content);
       expect(uut.unwrapOr("hello")).toBe(content);
       expect(uut.unwrapOrThrow("hello")).toBe(content);
@@ -91,7 +104,10 @@ describe("maybe", () => {
       });
       expect(andThenValue).toBe(Maybe.Empty);
 
+      expect(uut.toResult(new Error("nope"))).toEqual(Result.okay(content));
       expect(uut.toString()).toEqual('Value({"id":"utest"})');
+
+      expect(Maybe.withValue(uut)).toEqual(uut);
     });
 
     test("iterator on values", () => {
@@ -111,6 +127,7 @@ describe("maybe", () => {
       expect(index).toBe(0);
     });
   });
+
   describe("Maybe.wrap", () => {
     test("with values", () => {
       const num = Maybe.wrap(3);

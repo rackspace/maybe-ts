@@ -1,6 +1,15 @@
-# maybe-result - Safe function return handling without null and undefined in Typescript and Javascript
+# maybe-result - Safe function return handling in Typescript and Javascript
 
-## Introduction
+Deciding when a function should return an undefined, throw an `Error`, or returning some other sort of
+"something isn't right" is tough. That's because we don't always know how users _calling_ our function
+will work, and because we want to be clear, clean, and safe.
+
+This library provides two approaches for wrapping function results:
+
+- [Maybe](#maybe) for when something may or may not exist
+- [Result](#result) for when you want to return an error, but let the caller decide how to handle it
+
+## Maybe
 
 In many languages, we have concepts of exceptions but also a `null` value of some sort.
 (JavaScript has both `null` and `undefined`. Ugh!)
@@ -26,14 +35,16 @@ the possibly missing value. The caller can explicitly check for `isValue` or
 It is now the caller's choice. There are many other helper functions too, such as
 to unwrap with a default value to return in place of throwing if `isNone`.
 
-This is not an "anti-throw" utility like Rust's `Result` type is.
 In JavaScript we like to throw `Error` types, but in other languages we call these _exceptions_.
 **Throwing is still good for _exceptional_ cases. `Maybe` is for "normal" control flows.**
+
+`Maybe` is not only for function return values. It may be used elsewhere where you want a type-safe
+and immutable alternative to `undefined` and `null`.
 
 Here's a nice introduction to the concept:
 [Implementing a Maybe Pattern using a TypeScript Type Guard](https://medium.com/@sitapati/implementing-a-maybe-pattern-using-a-typescript-type-guard-81b55efc0af0)
 
-## Example by story
+### Example by story
 
 You might have defined a data repository class (access to a data store) like this:
 
@@ -51,7 +62,7 @@ a Widget not to be found. That becomes valid flow, so you find yourself writing 
 ```ts
   let widget: Widget | undefined;
   try {
-    widget = await repo.get(widgetID);
+    widget = await widgetRepo.get(widgetID);
   }
   catch (error) {
     if (!(error instanceof NotFoundError)) {
@@ -92,16 +103,16 @@ That makes it easier. It works. You just have to write _two_ functions every tim
 
 ```ts
 class WidgetRepository {
-  get(widgetID: string): PromiseMaybe<Widget> {
+  async get(widgetID: string): PromiseMaybe<Widget> {
     // implementation ...
   }
 }
 
 // One place elsewhere where you want to throw if not found
-const widget = Maybe.unwrap(await get(widgetID));
+const widget = Maybe.unwrap(await widgetRepo.get(widgetID));
 
 // Another place elsewhere where you want to handle the mising lookup
-const widget = Maybe.unwrapOrNull(await get(widgetID));
+const widget = Maybe.unwrapOrNull(await widgetRepo.get(widgetID));
 if (widget) {
   // do work
 } else {
@@ -109,27 +120,84 @@ if (widget) {
 }
 
 // Someplace where you have a default
-const widget = (await get(widgetID)).unwrapOr(defaultWidget);
+const widget = (await widgetRepo.get(widgetID)).unwrapOr(defaultWidget);
 ```
 
 There are many other functions both on the `Maybe` instance and static helper functions in
 the `Maybe` namespace.
 
+## Result
+
+Unlike `Maybe`, which simple has some value or no value and don't want to return `undefined`, 
+`Result` is for when you have an **error** and don't want to `throw`.
+Similar to `Maybe`, this is really all about the function giving the _caller_ the choice of
+how to handle a situation - in this case an _exceptional_ situation.
+
+This is modeled directly off of the Rust `Result` type, but made to pair cleanly with this implementation of `Maybe`.
+
+### Example
+
+Expanding on the previous example of a `WidgetRepository`, let's add a function that creates a new widget
+in the repository. A `create` function should error out though if the assumption that the widget doesn't
+yet exist is false.
+
+```ts
+class WidgetRepository {
+  async create(widget: CreatableWidget): Promise<Result<Widget,ConstraintError>> {
+    try {
+      // implementation ...
+      return Result.okay(newWidget);
+    } catch (err) {
+      return Result.error(err);
+    }
+  }
+}
+
+/*
+ * Elsewhere in the create-widget use-case...
+ */
+const createResult = await widgetRepo.create(creatableWidget);
+
+if (createResult.isOkay) {
+  return createResult.value;
+} else {
+  // Throw more end-user aligned error instead of the database error
+  throw new HttpBadRequest("Widget already exists");
+}
+
+/*
+ * Or more simply...
+ */
+const createResult = await widgetRepo.create(creatableWidget);
+return createResult.unwrapOrThrow(new HttpBadRequest("Widget already exists"));
+
+/*
+ * Or if you just want the behavior of if Result wasn't used, just unwrap it
+ * and any contained error will throw.
+ */
+return (await widgetRepo.create(creatableWidget)).unwrap();
+// or slightly more readable:
+return Result.unwrap(await widgetRepo.create(creatableWidget));
+// or convert to a Maybe, so that Maybe.None is returned in place of the error
+return (await widgetRepo.create(creatableWidget)).toMaybe();
+```
+
 ## API Use
 
-[API Documentation](https://www.jsdocs.io/package/maybe-result)
+Both `Maybe` and `Result` have many more member and static functions. Learn more:
 
-See the [unit test suite](src/index.spec.ts) for usage examples.
+- [API Documentation](https://www.jsdocs.io/package/maybe-result)
+- Full coverage examples in the [Maybe unit test suite](src/maybe.spec.ts) and [Result unit test suite](src/result.spec.ts).
 
 ## Origin and Alternatives
 
-This implementation is based on `Option` from [ts-results](https://github.com/vultix/ts-results),
+This implementation is based on [ts-results](https://github.com/vultix/ts-results),
 which adheres to the Rust API. 
-This library has more natual word choices, Promise support, and other enhancements.
+This library has more natual word choices, Promise support, additional functions, and other enhancements.
 
 There are many other libraries that do this same thing - just
 [search NPM for "maybe"](https://www.npmjs.com/search?q=maybe).
 It is up to you to decide which option is best for your project.
 
-**The goal of this "maybe" is to be featureful, safe, and easy to understand without 
+**The goal of this library is to be featureful, safe, and easy to understand without 
 a study of functional programming.**
