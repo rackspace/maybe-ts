@@ -30,7 +30,59 @@ interface BaseResult<T, E>
   readonly isError: boolean;
 
   /**
-   * When "okay", returns the value, otherwise throw an `Error` with the `message`.
+   * Unwrap the result's "okay" value and return it.
+   * When "error", throws the value instead.
+   * Generally, prefer to handle the error case explicitly or with `unwrapOr` or `unwrapOrNull`.
+   *
+   * @returns the "okay" value
+   * @throws the "error" value
+   */
+  unwrap(): T;
+
+  /**
+   * Unwrap the result's "okay" value and return it,
+   * or when "error", returns given alternative instead.
+   *
+   * @param altValue value or callback result to return when "error"
+   * @returns the "okay" value or the `altValue`.
+   */
+  unwrapOr<T2>(altValue: T2): T | T2;
+
+  /**
+   * Unwrap the result's "okay" value and return it,
+   * or-else when "error" calls alternative lazy callback and returns that value.
+   *
+   * @param altValueFn value or callback result to return when "error"
+   * @returns the "okay" value or the `altValueFn` result when "error".
+   */
+  unwrapOrElse<T2>(altValueFn: (error: E) => T2): T | T2;
+
+  /**
+   * Unwrap the result's "okay" value and return it.
+   * When "error", returns `null`.
+   *
+   * @returns the "okay" value or `null`
+   */
+  unwrapOrNull(): T | null;
+
+  /**
+   * Unwrap the result's "okay" value and return it.
+   * otherwise if an `altError` is provided, it is thrown,
+   * otherwise the "error" value of this result is thrown.
+   *
+   * When no `altError` parameter is provided, this is the same as `.unwrap()`
+   * but a bit more descriptive.
+   *
+   * @param altError (optional) `Error`, message for an `Error`, or callback that produces an `Error` to throw when "error"
+   * @returns "okay" value
+   * @throws `altError` or the result "error" value
+   */
+  unwrapOrThrow<E2 extends Error>(
+    altError?: string | Error | ((error: E) => E2),
+  ): T;
+
+  /**
+   * Throw with provided message (or a default) when not "okay".
    * Generally you should use an unwrap function instead, but this is useful for unit testing.
    *
    * @param message the message to throw when this is an "error"
@@ -40,58 +92,56 @@ interface BaseResult<T, E>
   expectOkay(message?: string): T;
 
   /**
-   * When "error", returns the value, otherwise throw an `Error` with the message.
-   * Because this function may throw, its use is generally discouraged.
-   * Instead, prefer to handle the error case explicitly or with `unwrapOr` or `unwrapOrNull`.
+   * Throw with provided message (or a default) when not "error".
+   * Generally, prefer to handle the "error" case explicitly or with `unwrapOr` or `unwrapOrNull`.
    * This may be useful for unit testing.
    *
-   * @param msg the message to throw when "okay".
+   * @param message the message to throw when "okay".
    * @returns the value when "error"
    * @throws `new Error(msg,value)` when "okay"
    */
-  expectError(msg?: string): E;
+  expectError(message?: string): E;
 
   /**
-   * When "okay", returns the value, otherwise throws the "error" value.
-   * Because this function may throw, its use is generally discouraged.
-   * Instead, prefer to handle the error case explicitly or with `unwrapOr` or `unwrapOrNull`.
+   * Perform boolean "or" operation.
    *
-   * @returns "okay" value
-   * @throws "error" value
+   * Returns `this` when "okay", otherwise returns `other`.
+   *
+   * @param other the right-hand operator
+   * @returns this "okay" or `other`.
    */
-  unwrap(): T;
+  or<T2, E2>(other: Result<T2, E2>): OkayResult<T> | Result<T2, E2>;
 
   /**
-   * When "okay", returns the value; otherwise returns the given alternative.
+   * Perform a lazy boolean "or" operation.
    *
-   * @param altValue value to return when "error"
-   * @returns the "okay" value or the `altValue`.
+   * Returns `this` when "okay", or-else lazy-cals `otherFn` and returns its result.
+   *
+   * @param otherFn the right-hand operator
+   * @returns this "okay" or `otherFn` result.
    */
-  unwrapOr<T2>(altValue: T2): T | T2;
+  orElse<T2>(otherFn: (error: E) => OkayResult<T2>): OkayResult<T | T2>;
+  orElse<E2>(otherFn: (error: E) => ErrorResult<E2>): Result<T, E2>;
+  orElse<T2, E2>(otherFn: (error: E) => Result<T2, E2>): Result<T | T2, E2>;
 
   /**
-   * When "okay", returns the value; otherwise returns `null`.
+   * Perform boolean "and" operation.
    *
-   * @returns the "okay" value or `null`
+   * When "error", returns this "error",
+   * otherwise returns `other`.
+   *
+   * @param other the right-hand operator
+   * @returns this "error" or `other`.
    */
-  unwrapOrNull(): T | null;
+  and<T2, E2>(other: Result<T2, E2>): ErrorResult<E> | Result<T2, E2>;
 
   /**
-   * When "okay", returns the value;
-   * otherwise if an `altError` is provided, it is thrown,
-   * otherwise the "error" value of this result is thrown.
+   * Perform a lazy boolean "and" operation by
+   * chaining the "okay" value into a mapper function.
    *
-   * When no `altError` parameter is provided, this is the same as `.unwrap()`
-   * but a bit more descriptive.
+   * Lazy calls `mapperFn` if the result "okay",
+   * otherwise returns this "error" `Result` as-is without calling `mapperFn`.
    *
-   * @param altError (optional) error to throw when "error"
-   * @returns "okay" value
-   * @throws `altError` or the result "error" value
-   */
-  unwrapOrThrow(altError?: string | Error): T;
-
-  /**
-   * Calls `mapperFn` if the result "okay", otherwise returns this "error" `Result` as-is.
    * This function can be used for control flow based on `Result` values.
    *
    * @param mapperFn function to map this value to another `Result`. (See `.map` to map values instead.)
@@ -100,11 +150,12 @@ interface BaseResult<T, E>
   andThen<T2>(mapperFn: (value: T) => OkayResult<T2>): Result<T2, E>;
   andThen<E2>(mapperFn: (value: T) => ErrorResult<E2>): Result<T, E | E2>;
   andThen<T2, E2>(mapperFn: (value: T) => Result<T2, E2>): Result<T2, E | E2>;
-  andThen<T2, E2>(mapperFn: (value: T) => Result<T2, E2>): Result<T2, E | E2>;
 
   /**
+   * Transform "okay" value, when present.
+   *
    * Maps a `Result<T, E>` to `Result<U, E>` by applying a function to the "okay" value,
-   * leaving an "error" value unmapped.
+   * leaving an "error" value unchanged.
    *
    * This function can be used to compose the results of two functions.
    *
@@ -115,27 +166,44 @@ interface BaseResult<T, E>
   map<U>(mapperFn: (value: T) => U): Result<U, E>;
 
   /**
-   * Maps a `Result<T, E>` to `Result<U, E>` when "okay" by applying a function.
-   * When "error", returns the provided `Error` (tossing the existing error).
+   * Transform "okay" value or use an alternative, resulting in a `Result` that is always "okay".
    *
-   * This function can be used to compose the results of two functions.
+   * Maps a `Result<T, E>` to `Result<U, E>` when "okay" by applying a function.
+   * When "error", returns given alternative instead.
    *
    * @param mapperFn function to map this value to a new value.
-   * @param altError alternative "error" to use
-   * @returns a new `Result` with the mapped "okay" value or the `altError` value
+   * @param altValue value to return when "error"
+   * @returns a new `Result` with the mapped "okay" value or the `altValue` value
    */
-  mapOr<U, E2>(mapperFn: (value: T) => U, altError: E2): Result<U, E | E2>;
+  mapOr<U>(mapperFn: (value: T) => U, altValue: U): OkayResult<U>;
 
   /**
+   * Transform "okay" value or-else lazy call an alternative, resulting in a `Result` that is always "okay".
+   *
+   * Maps a `Result<T, E>` to `Result<U, E>` when "okay" by applying a function.
+   * When "error", returns value from alternative callback instead.
+   *
+   * @param mapperFn function to map this value to a new value.
+   * @param altValueFn callback result to return when "error"
+   * @returns a new `Result` with the mapped "okay" value or the alternative value
+   */
+  mapOrElse<U>(
+    mapperFn: (value: T) => U,
+    altValueFn: (error: E) => U,
+  ): OkayResult<U>;
+
+  /**
+   * Transform "error" value, when present.
+   *
    * Maps a `Result<T, E>` to `Result<T, F>` by applying a function to an "error" value,
-   * leaving an "okay" value unmapped.
+   * leaving an "okay" value unchanged.
    *
    * This function can be used to pass through a successful result while handling an error.
    *
    * @param mapperFn function to map this "error" value to a new error
    * @returns a new `Result` with the mapped error, or `this` when "okay"
    */
-  mapError<F>(mapperFn: (val: E) => F): Result<T, F>;
+  mapError<F>(mapperFn: (error: E) => F): Result<T, F>;
 
   /**
    * Converts this `Result<T, E>` to `Maybe<T>`,
@@ -185,16 +253,6 @@ export class ErrorResult<E> implements BaseResult<never, E> {
     this._stack = stackLines?.join("\n") ?? "";
   }
 
-  expectOkay(msg: string): never {
-    throw new Error(`${msg} - ${toString(this.value)}\n${this._stack}`, {
-      cause: this.value,
-    });
-  }
-
-  expectError(_msg: string): E {
-    return this.value;
-  }
-
   unwrap(): never {
     throw this.value;
   }
@@ -203,12 +261,21 @@ export class ErrorResult<E> implements BaseResult<never, E> {
     return altValue;
   }
 
+  unwrapOrElse<T2>(altValueFn: (errorValue: E) => T2): T2 {
+    return altValueFn(this.value);
+  }
+
   unwrapOrNull(): null {
     return null;
   }
 
-  unwrapOrThrow(altError?: string | Error): never {
+  unwrapOrThrow<E2 extends Error>(
+    altError?: string | Error | ((error: E) => E2),
+  ): never {
     if (altError) {
+      if (typeof altError === "function") {
+        throw altError(this.value);
+      }
       if (altError instanceof Error) {
         throw altError;
       } else {
@@ -216,6 +283,33 @@ export class ErrorResult<E> implements BaseResult<never, E> {
       }
     }
     throw this.value;
+  }
+
+  expectOkay(message?: string): never {
+    throw new Error(
+      `${message ?? "Expected Okay"} - ${toString(this.value)}\n${this._stack}`,
+      {
+        cause: this.value,
+      },
+    );
+  }
+
+  expectError(_message?: string): E {
+    return this.value;
+  }
+
+  or<T2, E2>(other: Result<T2, E2>): Result<T2, E2> {
+    return other;
+  }
+
+  orElse<T2>(otherFn: (error: E) => OkayResult<T2>): OkayResult<T2>;
+  orElse<E2>(otherFn: (error: E) => ErrorResult<E2>): ErrorResult<E2>;
+  orElse<T2, E2>(otherFn: (error: E) => Result<T2, E2>): Result<T2, E2> {
+    return otherFn(this.value);
+  }
+
+  and(_other: unknown): ErrorResult<E> {
+    return this;
   }
 
   andThen(_mapperFn: unknown): ErrorResult<E> {
@@ -226,11 +320,15 @@ export class ErrorResult<E> implements BaseResult<never, E> {
     return this;
   }
 
-  mapOr<E2>(_mapperFn: unknown, altError: E2): ErrorResult<E2> {
-    return new ErrorResult<E2>(altError);
+  mapOr<U>(_mapperFn: unknown, altValue: U): OkayResult<U> {
+    return new OkayResult(altValue);
   }
 
-  mapError<E2>(mapperFn: (err: E) => E2): ErrorResult<E2> {
+  mapOrElse<U>(_mapperFn: unknown, altValueFn: (value: E) => U): OkayResult<U> {
+    return new OkayResult(altValueFn(this.value));
+  }
+
+  mapError<E2>(mapperFn: (error: E) => E2): ErrorResult<E2> {
     return new ErrorResult(mapperFn(this.value));
   }
 
@@ -239,11 +337,11 @@ export class ErrorResult<E> implements BaseResult<never, E> {
   }
 
   toString(): string {
-    return toString(this.value);
+    return `Error(${toString(this.value)})`;
   }
 
   get stack(): string | undefined {
-    return `${this}\n${this._stack}`;
+    return `${this.toString()}\n${this._stack}`;
   }
 }
 
@@ -276,19 +374,15 @@ export class OkayResult<T> implements BaseResult<T, never> {
     }
   }
 
-  expectOkay(_msg: string): T {
-    return this.value;
-  }
-
-  expectError(msg: string): never {
-    throw new Error(`${msg} - ${this.toString()}`);
-  }
-
   unwrap(): T {
     return this.value;
   }
 
   unwrapOr(_altValue: unknown): T {
+    return this.value;
+  }
+
+  unwrapOrElse(_altValueFn: unknown): T {
     return this.value;
   }
 
@@ -301,20 +395,40 @@ export class OkayResult<T> implements BaseResult<T, never> {
   }
 
   /**
-   * Returns the contained `Okay` value, but never throws.
-   * Unlike `unwrap()`, this method doesn't throw and is only callable on an OkayResult<T>.
+   * Returns the contained "okay" value and never throws.
+   *
+   * Unlike `unwrap()`, this method doesn't throw and is only callable on an "okay" `Result`.
    *
    * Therefore, it can be used instead of `unwrap()` as a maintainability safeguard that
-   * will fail to compile if the error type of the Result is later changed to an error
+   * will fail to compile if the "error" `Result` is later changed to an error
    * that can actually occur.
    */
   safeUnwrap(): T {
     return this.value;
   }
 
+  expectOkay(_message?: string): T {
+    return this.value;
+  }
+
+  expectError(message?: string): never {
+    throw new Error(`${message ?? "Expected Error"} - ${this.toString()}`);
+  }
+
+  or(_other: unknown): OkayResult<T> {
+    return this;
+  }
+
+  orElse(_otherFn: unknown): OkayResult<T> {
+    return this;
+  }
+
+  and<T2, E2>(other: Result<T2, E2>): Result<T2, E2> {
+    return other;
+  }
+
   andThen<T2>(mapperFn: (value: T) => OkayResult<T2>): OkayResult<T2>;
-  andThen<E2>(mapperFn: (value: T) => ErrorResult<E2>): Result<T, E2>;
-  andThen<T2, E2>(mapperFn: (value: T) => Result<T2, E2>): Result<T2, E2>;
+  andThen<E2>(mapperFn: (value: T) => ErrorResult<E2>): ErrorResult<E2>;
   andThen<T2, E2>(mapperFn: (value: T) => Result<T2, E2>): Result<T2, E2> {
     return mapperFn(this.value);
   }
@@ -323,7 +437,11 @@ export class OkayResult<T> implements BaseResult<T, never> {
     return new OkayResult(mapperFn(this.value));
   }
 
-  mapOr<T2>(mapperFn: (value: T) => T2, _altError: unknown): OkayResult<T2> {
+  mapOr<U>(mapperFn: (value: T) => U, _altValue: unknown): OkayResult<U> {
+    return new OkayResult(mapperFn(this.value));
+  }
+
+  mapOrElse<U>(mapperFn: (value: T) => U, _altValueFn: unknown): OkayResult<U> {
     return new OkayResult(mapperFn(this.value));
   }
 
@@ -336,7 +454,7 @@ export class OkayResult<T> implements BaseResult<T, never> {
   }
 
   toString(): string {
-    return `Okay: ${toString(this.value)}`;
+    return `Okay(${toString(this.value)})`;
   }
 }
 

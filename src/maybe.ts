@@ -20,11 +20,8 @@ interface BaseMaybe<T>
   readonly isValue: boolean;
   readonly isNone: boolean;
 
-  // expectSome(message?: string): T;
-  // expectNone(message?: string): T;
-
   /**
-   * Returns the "some" value.
+   * Returns the "some" value, or throw.
    * Use if you want a "none" value to throw an error.
    *
    * @returns the "some" value
@@ -33,11 +30,22 @@ interface BaseMaybe<T>
   unwrap(): T;
 
   /**
-   * Returns the "some" value or a provided default if "none".
+   * Unwrap the "some" value and return it,
+   * or when "none" returns the given alternative instead.
    *
+   * @param altValue value to return when "none"
    * @returns the "some" value, or `altValue` when "none"
    */
   unwrapOr<T2>(altValue: T2): T | T2;
+
+  /**
+   * Unwrap the "some" value and return it,
+   * or-else when "none" returns the given alternative lazy callback instead.
+   *
+   * @param altValueFn lazy callback result to return when "none"
+   * @returns the "some" value, or the `altValueFn` result when "none"
+   */
+  unwrapOrElse<T2>(altValueFn: () => T2): T | T2;
 
   /**
    * Returns the "some" value or `null` instead of throwing an error if "none".
@@ -49,21 +57,78 @@ interface BaseMaybe<T>
   /**
    * Returns the "some" value, if exists. Throws when "none".
    *
-   * @param errorMsg the Error or message (in new Error) to throw if no value.
-   * @throws `NoneError` when "none".
+   * @param altError (optional) `Error`, message for an `Error`, or callback that produces an `Error` to throw when "none"
+   * @returns the "some" value
+   * @throws the `altError` or `NoneError` when "none".
    */
-  unwrapOrThrow(errorMsg: string | Error): T;
+  unwrapOrThrow<E extends Error>(altError?: string | Error | (() => E)): T;
 
   /**
-   * Calls `mapperFn` when "some" value, otherwise returns itself as still "none".
-   * This function can be used for control flow based on `Maybe` values.
+   * Throw with provided message (or a default) when not "some" value.
+   * Generally you should use an unwrap function instead, but this is useful for unit testing.
+   *
+   * @param message the message to throw when this is "none"
+   * @returns the "some" value
+   * @throws `new NoneError(message)` when is "none"
+   */
+  expectSome(message?: string): T;
+
+  /**
+   * Throw with provided message (or a default) when not "none".
+   * Generally, prefer to handle the "none" case explicitly or with `unwrapOr` or `unwrapOrNull`.
+   * This may be useful for unit testing.
+   *
+   * @param message the message to throw when "some".
+   * @returns the "none"
+   * @throws `new Error(msg,value)` when "some"
+   */
+  expectNone(message?: string): Maybe.None;
+
+  /**
+   * Perform boolean "or" operation.
+   *
+   * Returns `this` when "some", otherwise returns `other`.
+   *
+   * @param other the right-hand operator
+   * @returns "none" or `other`.
+   */
+  or<T2>(other: Maybe<T2>): Maybe<T> | Maybe<T2>;
+
+  /**
+   * Perform a lazy boolean "or" operation.
+   *
+   * Returns `this` when "some", or-else returns the `otherFn` callback result.
+   *
+   * @param otherFn the right-hand operator
+   * @returns "none" or `otherFn` result.
+   */
+  orElse<T2>(otherFn: () => Maybe<T2>): Maybe<T> | Maybe<T2>;
+
+  /**
+   * Perform boolean "and" operation.
+   *
+   * Returns "none" if this is "none", otherwise returns `other`.
+   *
+   * @param other the right-hand operator
+   * @returns "none" or `other`.
+   */
+  and<T2>(other: Maybe<T2>): Maybe<T2> | Maybe.None;
+
+  /**
+   * Perform a lazy boolean "and" operation by
+   * chaining a "some" value into a mapper function.
+   *
+   * Calls `mapperFn` when "some" value,
+   * otherwise returns itself as still "none" without calling `mapperFn`.
    *
    * @param mapperFn function to map this value to another `Maybe`. (See `.map` to map values instead.)
    * @returns mapped "some" value, or `this` when "none".
    */
-  andThen<T2>(mapperFn: (value: T) => Maybe<T2>): Maybe<T2>;
+  andThen<T2>(mapperFn: (value: T) => Maybe<T2>): Maybe<T2> | Maybe.None;
 
   /**
+   * Transform "some" value, when present.
+   *
    * Maps an `Maybe<T>` to `Maybe<U>` by applying a function to the "some" value,
    * leaving a "none" untouched.
    *
@@ -76,35 +141,50 @@ interface BaseMaybe<T>
   map<U>(mapperFn: (value: T) => U): Maybe<U>;
 
   /**
-   * Maps an `Maybe<T>` to `Maybe<U>` by either converting `T` to `U` using `mapperFn` (in case
-   * of "some") or using the `defaultValue` value (in case of "none").
+   * Transform "some" value or use an alternative, resulting in a Maybe that is always "some" value.
    *
-   * If `defaultValue` is a result of a function call consider using `mapOrElse` instead, it will
+   * Maps a `Maybe<T>` to `Maybe<U>` by either converting `T` to `U` using `mapperFn` (in case
+   * of "some") or using the `altValue` value (in case of "none").
+   *
+   * If `altValue` is a result of a function call consider using `mapOrElse` instead, it will
    * only evaluate the function when needed.
    *
-   * @param defaultValue alternative value to use when "none"
-   * @param mapperFn function to map this "some" value to another
-   * @returns the resulting value
+   * @param mapperFn function to map this "some" value to a new value.
+   * @param altValue value to return when "none"
+   * @returns a new `Maybe` with the mapped "okay" value or the `altValue` value
    */
-  mapOr<U>(defaultValue: U, mapperFn: (value: T) => U): U;
+  mapOr<U>(mapperFn: (value: T) => U, altValue: U): MaybeValue<U>;
 
   /**
-   * Maps an `Maybe<T>` to `Maybe<U>` by either converting `T` to `U` using `mapperFn` (in case
-   * of "some") or producing a default value using the `defaultValueFn` function (in case of "none").
+   * Transform "some" value or-else lazy call an alternative, resulting in a Maybe that is always "some" value.
+
+   * Maps a `Maybe<T>` to `Maybe<U>` by either converting `T` to `U` using `mapperFn` (in case
+   * of "some") or using the `altValueFn` callback value (in case of "none").
    *
-   * @param defaultValueFn function to produce an alternative value to use when "none"
-   * @param mapperFn function to map this "some" value to another
-   * @returns the resulting value
+   * @param mapperFn function to map this "some" value to a new value.
+   * @param altValueFn callback result to return when "none"
+   * @returns a new `Maybe` with the mapped "okay" value or the alternative result value
    */
-  mapOrElse<U>(defaultValueFn: () => U, mapperFn: (value: T) => U): U;
+  mapOrElse<U>(mapperFn: (value: T) => U, altValueFn: () => U): MaybeValue<U>;
+
+  /**
+   * Filters "some" value to "none" if `predicateFn` returns `false`.
+   *
+   * When "some", calls the `predicateFn` and if it returns `false` returns "none".
+   * When "none", returns `this` unchanged and predicate not called.
+   *
+   * @param predicateFn filter function indicating whether to keep (`true`) the value
+   * @returns this `Maybe` or `Maybe.None`.
+   */
+  filter(predicateFn: (value: T) => boolean): Maybe<T>;
 
   /**
    * Convert a `Maybe<T>` to a `Result<T, E>`, with the provided `Error` value
    * to use when this is "none".
-   * @param error to use when "none"
+   * @param error to use when "none"; defaults to a `NoneError`
    * @return a `Result` with this "some" as the "okay" value, or `error` as the "error".
    */
-  toResult<E>(error: E): Result<T, E>;
+  toResult<E>(error?: E): Result<T, E | NoneError>;
 
   /**
    * This `Maybe` as a loggable string.
@@ -140,36 +220,68 @@ class MaybeNone implements BaseMaybe<never> {
     return altValue;
   }
 
+  unwrapOrElse<T2>(altValueFn: () => T2): T2 {
+    return altValueFn();
+  }
+
   unwrapOrNull(): null {
     return null;
   }
 
-  unwrapOrThrow(errorMsg: string | Error): never {
-    if (errorMsg instanceof Error) {
-      throw errorMsg;
+  unwrapOrThrow<E extends Error>(altError?: string | Error | (() => E)): never {
+    if (!altError) {
+      this.unwrap(); // sub-class MaybeNotFound overloads this
+    } else if (altError instanceof Error) {
+      throw altError;
+    } else if (typeof altError === "function") {
+      throw altError();
     } else {
-      throw new NoneError(errorMsg);
+      throw new NoneError(altError);
     }
+  }
+
+  expectSome(message?: string): never {
+    throw new NoneError(message);
+  }
+
+  expectNone(_message?: string): Maybe.None {
+    return this;
+  }
+
+  or<T2>(other: Maybe<T2>): Maybe<T2> {
+    return other;
+  }
+
+  orElse<T2>(otherFn: () => Maybe<T2>): Maybe<T2> {
+    return otherFn();
+  }
+
+  and(_other: unknown): Maybe.None {
+    return this;
+  }
+
+  andThen(_mapperFn: unknown): Maybe.None {
+    return this;
   }
 
   map(_mapperFn: unknown): Maybe.None {
     return this;
   }
 
-  mapOr<T2>(defaultValue: T2, _mapperFn: unknown): T2 {
-    return defaultValue;
+  mapOr<U>(_mapperFn: unknown, altValue: U): MaybeValue<U> {
+    return new MaybeValue(altValue);
   }
 
-  mapOrElse<U>(defaultValueFn: () => U, _mapperFn: unknown): U {
-    return defaultValueFn();
+  mapOrElse<U>(_mapperFn: unknown, altValueFn: () => U): MaybeValue<U> {
+    return new MaybeValue(altValueFn());
   }
 
-  andThen(_opFn: unknown): Maybe.None {
+  filter(_predicateFn: unknown): Maybe.None {
     return this;
   }
 
-  toResult<E>(error: E): ErrorResult<E> {
-    return new ErrorResult(error);
+  toResult<E>(error?: E): ErrorResult<E | NoneError> {
+    return new ErrorResult(error ?? new NoneError());
   }
 
   toString(): string {
@@ -257,28 +369,56 @@ class MaybeValue<T> implements BaseMaybe<T> {
     return this.value;
   }
 
-  unwrapOrNull(): T | null {
+  unwrapOrElse(_altValueFn: unknown): T {
     return this.value;
   }
 
-  unwrapOrThrow(_msg: string | Error): T {
+  unwrapOrNull(): T {
     return this.value;
   }
 
-  map<T2>(mapperFn: (value: T) => T2): MaybeValue<T2> {
-    return new MaybeValue<T2>(mapperFn(this.value));
+  unwrapOrThrow(_altError?: unknown): T {
+    return this.value;
   }
 
-  mapOr<T2>(_defaultValue: T2, mapperFn: (value: T) => T2): T2 {
-    return mapperFn(this.value);
+  expectSome(_message?: string): T {
+    return this.value;
   }
 
-  mapOrElse<U>(_defaultValueFn: () => U, mapperFn: (value: T) => U): U {
-    return mapperFn(this.value);
+  expectNone(message?: string): Maybe.None {
+    throw new Error(message ?? `Expected None, have ${this.toString()}`);
+  }
+
+  or(_other: unknown): Maybe<T> {
+    return this;
+  }
+
+  orElse(_otherFn: unknown): Maybe<T> {
+    return this;
+  }
+
+  and<T2>(other: Maybe<T2>): Maybe<T2> {
+    return other;
   }
 
   andThen<T2>(mapperFn: (value: T) => Maybe<T2>): Maybe<T2> {
     return mapperFn(this.value);
+  }
+
+  map<U>(mapperFn: (value: T) => U): MaybeValue<U> {
+    return new MaybeValue<U>(mapperFn(this.value));
+  }
+
+  mapOr<U>(mapperFn: (value: T) => U, _altValue: U): MaybeValue<U> {
+    return new MaybeValue(mapperFn(this.value));
+  }
+
+  mapOrElse<U>(mapperFn: (value: T) => U, _altValueFn: () => U): MaybeValue<U> {
+    return new MaybeValue<U>(mapperFn(this.value));
+  }
+
+  filter(predicateFn: (value: T) => boolean): Maybe<T> {
+    return predicateFn(this.value) ? this : Maybe.None;
   }
 
   toResult<E>(_error: E): OkayResult<T> {
