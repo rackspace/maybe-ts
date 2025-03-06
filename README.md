@@ -1,28 +1,28 @@
 # maybe-result - Safe function return handling in Typescript and Javascript
 
-Deciding when a function should return an undefined, throw an `Error`, or returning some other sort of
-"something isn't right" is tough. That's because we don't always know how users _calling_ our function
-will work, and because we want to be clear, clean, and safe.
+Deciding when a function should return `undefined`, throw an `Error`, or return some other indicator that
+"something isn't right" is tough. We don't always know how users _calling_ our function
+will use it, and we want to be clear, clean, and safe.
 
 This library provides two approaches for wrapping function results:
 
 - [Maybe](#maybe) for when something may or may not exist
-- [Result](#result) for when you want to return an error, but let the caller decide how to handle it
+- [Result](#result) for when you might have an error, but want to let the caller decide how to handle it
 
 ## Maybe
 
-In many languages, we have concepts of exceptions but also a `null` value of some sort.
+In many languages, we have concepts of exceptions and `null` values.
 (JavaScript has both `null` and `undefined`. Ugh!)
 
 Often a function will need to indicate when a value _maybe_ exists, or it does not.
 In JavaScript, the "does not" is usually returned as `undefined` or `null`, but sometimes
-a function will *throw* an `Error` type instead. Thus, the developer needs to figure out
+a function will _throw_ an `Error` type instead. Thus, the developer needs to figure out
 how that particular function behaves and adapt to that if they want to handle
 the missing value.
 
 Finally, throwing Errors in TypeScript can be expensive, as a stack trace must be
 generated and cross-referenced to the `.js.map` files. These stack traces to your
-TypeScript source are immensely useful to trace actual errors, but are wasted
+TypeScript source are immensely useful for tracing actual errors, but they are wasted
 processing when ignored.
 
 The `Maybe` type makes this cleaner. Elm was an early language that defined this.
@@ -44,9 +44,9 @@ and immutable alternative to `undefined` and `null`.
 Here's a nice introduction to the concept:
 [Implementing a Maybe Pattern using a TypeScript Type Guard](https://medium.com/@sitapati/implementing-a-maybe-pattern-using-a-typescript-type-guard-81b55efc0af0)
 
-### Example by story
+### Example by Story
 
-You might have defined a data repository class (access to a data store) like this:
+You might define a data repository class (access to a data store) like this:
 
 ```ts
 class WidgetRepository {
@@ -56,21 +56,22 @@ class WidgetRepository {
 }
 ```
 
-If the Widget isn't found, you throw a `NotFoundError`. All is well, until you start _expecting_
+If the Widget isn't found, you throw a `NotFoundError`. All is well until you start _expecting_
 a Widget not to be found. That becomes valid flow, so you find yourself writing this a lot:
 
 ```ts
-  let widget: Widget | undefined;
-  try {
-    widget = await widgetRepo.get(widgetID);
+let widget: Widget | undefined;
+try {
+  widget = await widgetRepo.get(widgetID);
+} catch (error) {
+  if (!(error instanceof NotFoundError)) {
+    throw error;
   }
-  catch (error) {
-    if (!(error instanceof NotFoundError)) {
-      throw error;
-    }
-  }
-  
-  if (widget) { /* ... */ }
+}
+
+if (widget) {
+  /* ... */
+}
 ```
 
 You may be willing to do that once... but not more. So you first try to change the repository:
@@ -83,7 +84,7 @@ class WidgetRepository {
 }
 ```
 
-Now it returns `undefined` instead of throwing. Oh, but what a hassle now you have to _check_ for
+Now it returns `undefined` instead of throwing. Oh, but what a hassle - now you have to _check_ for
 `undefined` _every time_ you call the function! So instead, you define _two_ functions:
 
 ```ts
@@ -99,7 +100,7 @@ class WidgetRepository {
 
 That makes it easier. It works. You just have to write _two_ functions every time you write a get function. 🙄
 
-**OR...** use Maybe
+**OR...** use `Maybe` 🎉
 
 ```ts
 class WidgetRepository {
@@ -123,27 +124,33 @@ if (widget) {
 const widget = (await widgetRepo.get(widgetID)).unwrapOr(defaultWidget);
 ```
 
+---
+
 There are many other functions both on the `Maybe` instance and static helper functions in
 the `Maybe` namespace.
 
 ## Result
 
-Unlike `Maybe`, which simple has some value or no value and don't want to return `undefined`, 
+Unlike `Maybe`, which simply has some value or no value and doesn't want to return `undefined`,
 `Result` is for when you have an **error** and don't want to `throw`.
-Similar to `Maybe`, this is really all about the function giving the _caller_ the choice of
+Similar to `Maybe`, this is all about the function giving the caller the _choice_ of
 how to handle a situation - in this case an _exceptional_ situation.
 
-This is modeled directly off of the Rust `Result` type, but made to pair cleanly with this implementation of `Maybe`.
+This is modeled off of the Rust `Result` type, but made to pair cleanly with this
+implementation of `Maybe`.
 
 ### Example
 
-Expanding on the previous example of a `WidgetRepository`, let's add a function that creates a new widget
-in the repository. A `create` function should error out though if the assumption that the widget doesn't
-yet exist is false.
+Expanding on the previous example of a `WidgetRepository`,
+let's add a function in the repository that creates a new widget.
+A `create` function should error out if the assumption that the
+widget doesn't yet exist is false.
 
 ```ts
 class WidgetRepository {
-  async create(widget: CreatableWidget): Promise<Result<Widget,ConstraintError>> {
+  async create(
+    widget: CreatableWidget,
+  ): Promise<Result<Widget, ConstraintError>> {
     try {
       // implementation ...
       return Result.okay(newWidget);
@@ -189,23 +196,23 @@ Both `Maybe` and `Result` have many more member and static functions. Learn more
 - [API Documentation](https://www.jsdocs.io/package/maybe-result)
 - Full coverage examples in the [Maybe unit test suite](src/maybe.spec.ts) and [Result unit test suite](src/result.spec.ts).
 - Functions are named per some foundational concepts:
-  - `wrap` wraps up a value in a `Maybe` or `Result`
-  - `unwrap` means to extract the value contained in a `Maybe` or `Result`
-  - `or` performs a boolean _or_ operation between two `Maybe` or `Result` instances
-  - `orElse` lazily gets the second operand for an _or_ operation via a callback function _only_ if needed 
-  - `and` performs a boolean _and_ operation between two `Maybe` or `Result` instances
+  - `wrap` wraps up a value
+  - `unwrap` means to extract the value
+  - `or` performs a boolean _or_ operation between two instances
+  - `orElse` lazily gets the second operand for an _or_ operation via a callback function _only_ if needed
+  - `and` performs a boolean _and_ operation between two instances
   - `andThen` lazily gets the second operand for an _and_ operation via a callback function _only_ if needed
-  - `map` functions transform the value in a `Maybe` or `Result` to return a new instance (immutably)
+  - `map` functions transform the value to return a new instance (immutably)
 
 ## Origin and Alternatives
 
 This implementation is based on [ts-results](https://github.com/vultix/ts-results),
-which adheres to the Rust API. 
+which adheres to the Rust API.
 This library has more natual word choices, Promise support, additional functions, and other enhancements.
 
 There are many other libraries that do this same thing - just
 [search NPM for "maybe"](https://www.npmjs.com/search?q=maybe).
 It is up to you to decide which option is best for your project.
 
-**The goal of this library is to be featureful, safe, and easy to understand without 
-a study of functional programming.**
+_The goal of this library is to be featureful, safe, and easy to understand without
+a study of functional programming._
