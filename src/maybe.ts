@@ -64,6 +64,7 @@ interface BaseMaybe<T>
   unwrapOrThrow<E extends Error>(altError?: string | Error | (() => E)): T;
 
   /**
+   * Assert that this `Maybe` has "some" value.
    * Throw with provided message (or a default) when not "some" value.
    * Generally you should use an unwrap function instead, but this is useful for unit testing.
    *
@@ -71,9 +72,10 @@ interface BaseMaybe<T>
    * @returns the "some" value
    * @throws `new NoneError(message)` when is "none"
    */
-  expectSome(message?: string): T;
+  assertIsValue(message?: string): T;
 
   /**
+   * Assert that this `Maybe` is "none".
    * Throw with provided message (or a default) when not "none".
    * Generally, prefer to handle the "none" case explicitly or with `unwrapOr` or `unwrapOrNull`.
    * This may be useful for unit testing.
@@ -82,7 +84,7 @@ interface BaseMaybe<T>
    * @returns the "none"
    * @throws `new Error(msg,value)` when "some"
    */
-  expectNone(message?: string): Maybe.None;
+  assertIsNone(message?: string): Maybe.None;
 
   /**
    * Perform boolean "or" operation.
@@ -240,11 +242,11 @@ class MaybeNone implements BaseMaybe<never> {
     }
   }
 
-  expectSome(message?: string): never {
+  assertIsValue(message?: string): never {
     throw new NoneError(message);
   }
 
-  expectNone(_message?: string): Maybe.None {
+  assertIsNone(_message?: string): Maybe.None {
     return this;
   }
 
@@ -256,27 +258,30 @@ class MaybeNone implements BaseMaybe<never> {
     return otherFn();
   }
 
-  and(_other: unknown): Maybe.None {
+  and<T2>(_other: Maybe<T2>): Maybe.None {
     return this;
   }
 
-  andThen(_mapperFn: unknown): Maybe.None {
+  andThen<T2>(_mapperFn: (value: never) => Maybe<T2>): Maybe.None {
     return this;
   }
 
-  map(_mapperFn: unknown): Maybe.None {
+  map<U>(_mapperFn: (value: never) => U): Maybe.None {
     return this;
   }
 
-  mapOr<U>(_mapperFn: unknown, altValue: U): MaybeValue<U> {
+  mapOr<U>(_mapperFn: (value: never) => U, altValue: U): MaybeValue<U> {
     return new MaybeValue(altValue);
   }
 
-  mapOrElse<U>(_mapperFn: unknown, altValueFn: () => U): MaybeValue<U> {
+  mapOrElse<U>(
+    _mapperFn: (value: never) => U,
+    altValueFn: () => U,
+  ): MaybeValue<U> {
     return new MaybeValue(altValueFn());
   }
 
-  filter(_predicateFn: unknown): Maybe.None {
+  filter(_predicateFn: (value: never) => boolean): Maybe.None {
     return this;
   }
 
@@ -365,11 +370,11 @@ class MaybeValue<T> implements BaseMaybe<T> {
     return this.value;
   }
 
-  unwrapOr(_altValue: unknown): T {
+  unwrapOr<T2>(_altValue: T2): T {
     return this.value;
   }
 
-  unwrapOrElse(_altValueFn: unknown): T {
+  unwrapOrElse<T2>(_altValueFn: () => T2): T {
     return this.value;
   }
 
@@ -377,23 +382,23 @@ class MaybeValue<T> implements BaseMaybe<T> {
     return this.value;
   }
 
-  unwrapOrThrow(_altError?: unknown): T {
+  unwrapOrThrow<E extends Error>(_altError?: string | Error | (() => E)): T {
     return this.value;
   }
 
-  expectSome(_message?: string): T {
+  assertIsValue(_message?: string): T {
     return this.value;
   }
 
-  expectNone(message?: string): Maybe.None {
+  assertIsNone(message?: string): Maybe.None {
     throw new Error(message ?? `Expected None, have ${this.toString()}`);
   }
 
-  or(_other: unknown): Maybe<T> {
+  or<T2>(_other: Maybe<T2>): Maybe<T> {
     return this;
   }
 
-  orElse(_otherFn: unknown): Maybe<T> {
+  orElse<T2>(_otherFn: () => Maybe<T2>): Maybe<T> {
     return this;
   }
 

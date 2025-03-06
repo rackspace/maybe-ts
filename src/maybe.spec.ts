@@ -1,41 +1,79 @@
-import { Maybe, NotFoundError } from "./maybe";
+import { Maybe, NoneError, NotFoundError } from "./maybe";
 import { Result } from "./result";
 import isMaybe = Maybe.isMaybe;
 
 describe("Maybe", () => {
   describe("with None", () => {
-    test("factory asNone", () => {
-      expect(Maybe.asNone()).toBe(Maybe.None);
+    const uut = Maybe.asNone();
+
+    test("has identifying properties", () => {
+      expect(uut).toBe(Maybe.None);
+      expect(uut.isNone).toBe(true);
+      expect(uut.isValue).toBe(false);
     });
 
-    test("has basic uses", () => {
-      expect(Maybe.None.isNone).toBe(true);
-      expect(Maybe.None.isValue).toBe(false);
+    test("is identified with type guard", () => {
+      expect(Maybe.isMaybe(uut)).toBeTruthy();
+      expect(Maybe.isMaybe("sunday")).toBeFalsy();
+    });
 
-      expect(() => Maybe.None.unwrap()).toThrow();
-      expect(Maybe.None.unwrapOr("hello")).toEqual("hello");
-      expect(() => Maybe.None.unwrapOrThrow("hello")).toThrow();
+    test("can be unwrapped", () => {
+      expect(() => uut.unwrap()).toThrow(NoneError);
+
+      expect(uut.unwrapOr("hello")).toEqual("hello");
+      expect(uut.unwrapOrElse(() => 42)).toEqual(42);
+
+      expect(() => uut.unwrapOrThrow()).toThrow(NoneError);
+      expect(() => uut.unwrapOrThrow("hello")).toThrow(NoneError);
       const myError = new Error("mine");
-      expect(() => Maybe.None.unwrapOrThrow(myError)).toThrow(myError);
-      expect(Maybe.None.unwrapOrNull()).toBeNull();
+      expect(() => uut.unwrapOrThrow(myError)).toThrow(myError);
+      expect(() => uut.unwrapOrThrow(() => myError)).toThrow(myError);
 
-      expect(Maybe.None.map(() => true)).toBe(Maybe.None);
-      expect(Maybe.None.mapOr("orThis", () => true)).toEqual("orThis");
+      expect(uut.unwrapOrNull()).toBeNull();
+    });
+
+    test("can be asserted", () => {
+      expect(() => uut.assertIsValue()).toThrow(NoneError);
+      expect(() => uut.assertIsValue("missing")).toThrow("missing");
+      expect(uut.assertIsNone()).toEqual(Maybe.None);
+    });
+
+    test("can be combined with another Maybe", () => {
+      const other = Maybe.withValue(2);
+
+      expect(uut.or(Maybe.None)).toBe(Maybe.None);
+      expect(uut.or(other)).toBe(other);
+      expect(uut.orElse(() => other)).toBe(other);
+
+      expect(uut.and(Maybe.None)).toBe(Maybe.None);
+      expect(uut.and(other)).toBe(Maybe.None);
+      expect(uut.andThen(() => Maybe.None)).toBe(Maybe.None);
+      expect(uut.andThen(() => other)).toBe(Maybe.None);
+    });
+
+    test("can be transformed", () => {
+      expect(uut.map(() => true)).toBe(Maybe.None);
+      expect(uut.mapOr(() => "that", "orThis")).toEqual(
+        Maybe.withValue("orThis"),
+      );
       expect(
-        Maybe.None.mapOrElse(
-          () => "orElse",
-          () => true,
+        uut.mapOrElse(
+          (_value) => "mapped",
+          () => "otherwise",
         ),
-      ).toEqual("orElse");
-      expect(Maybe.None.andThen("ignored")).toBe(Maybe.None);
+      ).toEqual(Maybe.withValue("otherwise"));
 
-      expect(Maybe.None.toString()).toEqual("None");
+      expect(uut.filter((_value) => true)).toBe(Maybe.None);
+
       const resultError = new Error("mine");
-
-      expect(Maybe.None.toResult(resultError)).toEqual({
+      expect(uut.toResult(resultError)).toEqual({
         ...Result.error(resultError),
         _stack: expect.any(String),
       });
+    });
+
+    test("can be stringified", () => {
+      expect(uut.toString()).toEqual("None");
     });
 
     test("has empty iterator", () => {
@@ -59,55 +97,71 @@ describe("Maybe", () => {
   });
 
   describe("with Some value", () => {
-    test("factory withValue / isMaybe", () => {
-      const uut = Maybe.withValue("hi");
-      expect(Maybe.isMaybe(uut)).toBeTruthy();
+    const content = { id: "utest", count: 2 };
+    const uut = Maybe.withValue(content);
+
+    test("prevents nesting constructor", () => {
+      expect(Maybe.withValue(Maybe.withValue(uut))).toEqual(uut);
     });
 
-    test("has basic uses", () => {
-      const content = { id: "utest" };
-      const uut = Maybe.withValue(content);
-
+    test("has identifying properties", () => {
       expect(uut.isNone).toBe(false);
       expect(uut.isValue).toBe(true);
+    });
 
+    test("is identified with type guard", () => {
+      expect(Maybe.isMaybe(uut)).toBeTruthy();
+      expect(Maybe.isMaybe({ isValue: true })).toBeFalsy();
+    });
+
+    test("can be unwrapped", () => {
       expect(uut.unwrap()).toBe(content);
       expect(uut.unwrapOr("hello")).toBe(content);
-      expect(uut.unwrapOrThrow("hello")).toBe(content);
+      expect(uut.unwrapOrElse(() => false)).toBe(content);
+      expect(uut.unwrapOrThrow()).toBe(content);
+      expect(uut.unwrapOrThrow("Boom")).toBe(content);
       expect(uut.unwrapOrNull()).toBe(content);
+    });
 
-      const mapValue = uut.map((value) => {
-        expect(value).toBe(content);
-        return true;
-      });
-      expect(mapValue.isValue).toBe(true);
-      expect(mapValue.unwrap()).toBe(true);
+    test("can be asserted", () => {
+      expect(uut.assertIsValue()).toEqual(content);
+      expect(() => uut.assertIsNone()).toThrow(/^Expected None, have Value/);
+      expect(() => uut.assertIsNone("Found")).toThrow("Found");
+    });
 
-      const mapOrValue = uut.mapOr("unused", (value) => {
-        expect(value).toBe(content);
-        return "mapped";
-      });
-      expect(mapOrValue).toBe("mapped");
+    test("can be combined with another Maybe", () => {
+      const other = Maybe.withValue(2);
 
-      const mapOrElseValue = uut.mapOrElse(
-        () => "unused",
-        (value) => {
-          expect(value).toBe(content);
-          return "mapped";
-        },
+      expect(uut.or(Maybe.None)).toBe(uut);
+      expect(uut.or(other)).toBe(uut);
+      expect(uut.orElse(() => other)).toBe(uut);
+
+      expect(uut.and(Maybe.None)).toBe(Maybe.None);
+      expect(uut.and(other)).toBe(other);
+      expect(uut.andThen(() => Maybe.None)).toBe(Maybe.None);
+      expect(uut.andThen(() => other)).toBe(other);
+    });
+
+    test("can be transformed", () => {
+      expect(uut.map((value) => value.count + 1)).toEqual(Maybe.withValue(3));
+      expect(uut.mapOr((value) => value.id, "orThis")).toEqual(
+        Maybe.withValue(content.id),
       );
-      expect(mapOrElseValue).toBe("mapped");
+      expect(
+        uut.mapOrElse(
+          (value) => ({ ...value, count: 5 }),
+          () => null,
+        ),
+      ).toEqual(Maybe.withValue({ id: content.id, count: 5 }));
 
-      const andThenValue = uut.andThen((value) => {
-        expect(value).toBe(content);
-        return Maybe.Empty;
-      });
-      expect(andThenValue).toBe(Maybe.Empty);
+      expect(uut.filter((_value) => true)).toBe(uut);
+      expect(uut.filter((_value) => false)).toBe(Maybe.None);
 
-      expect(uut.toResult(new Error("nope"))).toEqual(Result.okay(content));
-      expect(uut.toString()).toEqual('Value({"id":"utest"})');
+      expect(uut.toResult(new Error("mine"))).toEqual(Result.okay(content));
+    });
 
-      expect(Maybe.withValue(uut)).toEqual(uut);
+    test("can be stringified", () => {
+      expect(uut.toString()).toEqual('Value({"id":"utest","count":2})');
     });
 
     test("iterator on values", () => {

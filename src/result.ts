@@ -82,6 +82,7 @@ interface BaseResult<T, E>
   ): T;
 
   /**
+   * Assert that this `Result` is "okay".
    * Throw with provided message (or a default) when not "okay".
    * Generally you should use an unwrap function instead, but this is useful for unit testing.
    *
@@ -89,9 +90,10 @@ interface BaseResult<T, E>
    * @returns the value when this is "okay"
    * @throws `new Error(message,value)` when is "error"
    */
-  expectOkay(message?: string): T;
+  assertIsOkay(message?: string): T;
 
   /**
+   * Assert that this `Result` is "error".
    * Throw with provided message (or a default) when not "error".
    * Generally, prefer to handle the "error" case explicitly or with `unwrapOr` or `unwrapOrNull`.
    * This may be useful for unit testing.
@@ -100,7 +102,7 @@ interface BaseResult<T, E>
    * @returns the value when "error"
    * @throws `new Error(msg,value)` when "okay"
    */
-  expectError(message?: string): E;
+  assertIsError(message?: string): E;
 
   /**
    * Perform boolean "or" operation.
@@ -285,16 +287,16 @@ export class ErrorResult<E> implements BaseResult<never, E> {
     throw this.value;
   }
 
-  expectOkay(message?: string): never {
+  assertIsOkay(message?: string): never {
     throw new Error(
-      `${message ?? "Expected Okay"} - ${toString(this.value)}\n${this._stack}`,
+      `${message ?? "Expected Okay"} - ${this.toString()}\n${this._stack}`,
       {
         cause: this.value,
       },
     );
   }
 
-  expectError(_message?: string): E {
+  assertIsError(_message?: string): E {
     return this.value;
   }
 
@@ -308,23 +310,26 @@ export class ErrorResult<E> implements BaseResult<never, E> {
     return otherFn(this.value);
   }
 
-  and(_other: unknown): ErrorResult<E> {
+  and<T2, E2>(_other: Result<T2, E2>): ErrorResult<E> {
     return this;
   }
 
-  andThen(_mapperFn: unknown): ErrorResult<E> {
+  andThen<T2, E2>(_mapperFn: (value: never) => Result<T2, E2>): ErrorResult<E> {
     return this;
   }
 
-  map(_mapperFn: unknown): ErrorResult<E> {
+  map<U>(_mapperFn: (value: never) => U): ErrorResult<E> {
     return this;
   }
 
-  mapOr<U>(_mapperFn: unknown, altValue: U): OkayResult<U> {
+  mapOr<U>(_mapperFn: (value: never) => U, altValue: U): OkayResult<U> {
     return new OkayResult(altValue);
   }
 
-  mapOrElse<U>(_mapperFn: unknown, altValueFn: (value: E) => U): OkayResult<U> {
+  mapOrElse<U>(
+    _mapperFn: (value: never) => U,
+    altValueFn: (value: E) => U,
+  ): OkayResult<U> {
     return new OkayResult(altValueFn(this.value));
   }
 
@@ -378,11 +383,11 @@ export class OkayResult<T> implements BaseResult<T, never> {
     return this.value;
   }
 
-  unwrapOr(_altValue: unknown): T {
+  unwrapOr<T2>(_altValue: T2): T {
     return this.value;
   }
 
-  unwrapOrElse(_altValueFn: unknown): T {
+  unwrapOrElse<T2>(_altValueFn: (error: never) => T2): T {
     return this.value;
   }
 
@@ -390,7 +395,9 @@ export class OkayResult<T> implements BaseResult<T, never> {
     return this.value;
   }
 
-  unwrapOrThrow(_altError?: unknown): T {
+  unwrapOrThrow<E2 extends Error>(
+    _altError?: string | Error | ((error: never) => E2),
+  ): T {
     return this.value;
   }
 
@@ -407,19 +414,19 @@ export class OkayResult<T> implements BaseResult<T, never> {
     return this.value;
   }
 
-  expectOkay(_message?: string): T {
+  assertIsOkay(_message?: string): T {
     return this.value;
   }
 
-  expectError(message?: string): never {
+  assertIsError(message?: string): never {
     throw new Error(`${message ?? "Expected Error"} - ${this.toString()}`);
   }
 
-  or(_other: unknown): OkayResult<T> {
+  or<T2, E2>(_other: Result<T2, E2>): OkayResult<T> {
     return this;
   }
 
-  orElse(_otherFn: unknown): OkayResult<T> {
+  orElse<T2, E2>(_otherFn: (error: never) => Result<T2, E2>): OkayResult<T> {
     return this;
   }
 
@@ -437,15 +444,18 @@ export class OkayResult<T> implements BaseResult<T, never> {
     return new OkayResult(mapperFn(this.value));
   }
 
-  mapOr<U>(mapperFn: (value: T) => U, _altValue: unknown): OkayResult<U> {
+  mapOr<U>(mapperFn: (value: T) => U, _altValue: U): OkayResult<U> {
     return new OkayResult(mapperFn(this.value));
   }
 
-  mapOrElse<U>(mapperFn: (value: T) => U, _altValueFn: unknown): OkayResult<U> {
+  mapOrElse<U>(
+    mapperFn: (value: T) => U,
+    _altValueFn: (error: never) => U,
+  ): OkayResult<U> {
     return new OkayResult(mapperFn(this.value));
   }
 
-  mapError(_mapperFn: unknown): OkayResult<T> {
+  mapError<F>(_mapperFn: (error: never) => F): OkayResult<T> {
     return this;
   }
 

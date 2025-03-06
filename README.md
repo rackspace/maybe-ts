@@ -188,6 +188,14 @@ Both `Maybe` and `Result` have many more member and static functions. Learn more
 
 - [API Documentation](https://www.jsdocs.io/package/maybe-result)
 - Full coverage examples in the [Maybe unit test suite](src/maybe.spec.ts) and [Result unit test suite](src/result.spec.ts).
+- Functions are named per some foundational concepts:
+  - `wrap` wraps up a value in a `Maybe` or `Result`
+  - `unwrap` means to extract the value contained in a `Maybe` or `Result`
+  - `or` performs a boolean _or_ operation between two `Maybe` or `Result` instances
+  - `orElse` lazily gets the second operand for an _or_ operation via a callback function _only_ if needed 
+  - `and` performs a boolean _and_ operation between two `Maybe` or `Result` instances
+  - `andThen` lazily gets the second operand for an _and_ operation via a callback function _only_ if needed
+  - `map` functions transform the value in a `Maybe` or `Result` to return a new instance (immutably)
 
 ## Origin and Alternatives
 

@@ -1,46 +1,88 @@
 import { Maybe } from "./maybe";
 import { Result } from "./result";
-import isResult = Result.isResult;
 
 describe("Result", () => {
   describe("as Error", () => {
-    test("has basic uses", () => {
-      const uutError = new Error("Boom!");
-      const otherError = new Error("Other");
-      const uut = Result.error(uutError);
+    const uutError = new Error("Boom!");
+    const otherError = new Error("Other");
+    const uut = Result.error(uutError);
 
-      expect(uut.isOkay).toBe(false);
+    test("has identifying properties", () => {
       expect(uut.isError).toBe(true);
+      expect(uut.isOkay).toBe(false);
+      expect(uut.stack).toMatch(/^Error\(Error: Boom!\)\n/);
+    });
 
-      expect(() => uut.expectOkay("Failed")).toThrow(
-        /^Failed - Error: Boom!\n/,
-      );
-      expect(uut.expectError("ignore")).toEqual(uutError);
+    test("is identified with type guard", () => {
+      expect(Result.isResult(uut)).toBeTruthy();
+      expect(Result.isResult("sunday")).toBeFalsy();
+    });
 
+    test("can be unwrapped", () => {
       expect(() => uut.unwrap()).toThrow(uutError);
+
       expect(uut.unwrapOr(3)).toBe(3);
+      expect(uut.unwrapOrElse((err) => err.message)).toEqual("Boom!");
       expect(uut.unwrapOrNull()).toBeNull();
+
       expect(() => uut.unwrapOrThrow()).toThrow(uutError);
+      expect(() => uut.unwrapOrThrow("hello")).toThrow("hello");
       expect(() => uut.unwrapOrThrow(otherError)).toThrow(otherError);
+      expect(() => uut.unwrapOrThrow(() => otherError)).toThrow(otherError);
+    });
 
-      expect(uut.andThen(() => {})).toBe(uut);
+    test("can be asserted", () => {
+      expect(() => uut.assertIsOkay()).toThrow(
+        /^Expected Okay - Error\(Error: Boom!\)\n/,
+      );
+      expect(() => uut.assertIsOkay("Failed")).toThrow(
+        /^Failed - Error\(Error: Boom!\)\n/,
+      );
+      expect(uut.assertIsError("ignore")).toEqual(uutError);
+    });
 
-      expect(uut.map(() => {})).toBe(uut);
+    test("can be combined with another Result", () => {
+      const otherErr = Result.error(otherError);
+      const otherOkay = Result.okay(42);
 
-      const mappedNotOkay = uut.mapOr(() => {}, otherError);
-      expect(mappedNotOkay.expectError("expected error")).toEqual(otherError);
+      expect(uut.or(otherErr)).toEqual(otherErr);
+      expect(uut.or(otherOkay)).toEqual(otherOkay);
+
+      expect(uut.orElse((_err) => otherErr)).toEqual(otherErr);
+      expect(uut.orElse((_err) => otherOkay)).toEqual(otherOkay);
+
+      expect(uut.and(otherErr)).toEqual(uut);
+      expect(uut.and(otherOkay)).toEqual(uut);
+
+      expect(uut.andThen(() => otherErr)).toBe(uut);
+      expect(uut.andThen(() => otherOkay)).toBe(uut);
+    });
+
+    test("can be transformed", () => {
+      expect(uut.map((_value) => -1)).toBe(uut);
+
+      expect(uut.mapOr(() => -1, 42)).toEqual(Result.okay(42));
+      expect(
+        uut.mapOrElse(
+          () => "nop",
+          (err) => err.name,
+        ),
+      ).toEqual(Result.okay("Error"));
 
       const mappedError = uut.mapError(() => otherError);
-      expect(mappedError.expectError("expected error")).toEqual(otherError);
+      expect(mappedError.assertIsError("expected error")).toEqual(otherError);
 
       expect(uut.toMaybe()).toEqual(Maybe.None);
-      expect(uut.toString()).toEqual("Error: Boom!");
-      expect(uut.stack).toMatch(/^Error: Boom!\n/);
 
+      // Re-wrap value
       const wrapToOkay = Result.okay(uut);
-      expect(wrapToOkay.expectOkay("expected okay")).toEqual(uutError);
+      expect(wrapToOkay.assertIsOkay("expected okay")).toEqual(uutError);
       const singleWrapError = Result.error(uut);
-      expect(singleWrapError.expectError("unexpected")).toEqual(uutError);
+      expect(singleWrapError.assertIsError("unexpected")).toEqual(uutError);
+    });
+
+    test("can be stringified", () => {
+      expect(uut.toString()).toEqual("Error(Error: Boom!)");
     });
 
     test("has empty iterator", () => {
@@ -53,42 +95,88 @@ describe("Result", () => {
   });
 
   describe("as Okay", () => {
-    test("has basic uses", () => {
-      const uutValue = { id: 2, name: "happy" };
-      const otherError = new Error("Other");
-      const uut = Result.okay(uutValue);
+    const uutValue = { id: 2, name: "happy" };
+    const otherError = new Error("Other");
+    const uut = Result.okay(uutValue);
 
-      expect(uut.isOkay).toBe(true);
+    test("has identifying properties", () => {
       expect(uut.isError).toBe(false);
+      expect(uut.isOkay).toBe(true);
+    });
 
-      expect(uut.expectOkay("ignore")).toEqual(uutValue);
-      expect(() => uut.expectError("Failed")).toThrow(
-        /^Failed - Okay: {"id":2,"name":"happy"}/,
-      );
+    test("is identified with type guard", () => {
+      expect(Result.isResult(uut)).toBeTruthy();
+      expect(Result.isResult(1)).toBeFalsy();
+    });
 
+    test("can be unwrapped", () => {
       expect(uut.unwrap()).toBe(uutValue);
-      expect(uut.unwrapOr(3)).toBe(uutValue);
-      expect(uut.unwrapOrNull()).toBe(uutValue);
-      expect(uut.unwrapOrThrow()).toBe(uutValue);
-      expect(uut.unwrapOrThrow(otherError)).toBe(uutValue);
+      expect(uut.safeUnwrap()).toEqual(uutValue);
 
+      expect(uut.unwrapOr(3)).toBe(uutValue);
+      expect(uut.unwrapOrElse((_err) => null)).toEqual(uutValue);
+      expect(uut.unwrapOrNull()).toEqual(uutValue);
+
+      expect(uut.unwrapOrThrow()).toBe(uutValue);
+      expect(uut.unwrapOrThrow("fail")).toBe(uutValue);
+      expect(uut.unwrapOrThrow(otherError)).toBe(uutValue);
+      expect(uut.unwrapOrThrow((_err) => otherError)).toBe(uutValue);
+    });
+
+    test("can be asserted", () => {
+      expect(uut.assertIsOkay("ignore")).toEqual(uutValue);
+      expect(() => uut.assertIsError()).toThrow(
+        /^Expected Error - Okay\({"id":2,"name":"happy"}\)/,
+      );
+      expect(() => uut.assertIsError("Failed")).toThrow(
+        /^Failed - Okay\({"id":2,"name":"happy"}\)/,
+      );
+    });
+
+    test("can be combined with another Result", () => {
+      const otherErr = Result.error(otherError);
+      const otherOkay = Result.okay(42);
+
+      expect(uut.or(otherErr)).toEqual(uut);
+      expect(uut.or(otherOkay)).toEqual(uut);
+
+      expect(uut.orElse((_err) => otherErr)).toEqual(uut);
+      expect(uut.orElse((_err) => otherOkay)).toEqual(uut);
+
+      expect(uut.and(otherErr)).toEqual(otherErr);
+      expect(uut.and(otherOkay)).toEqual(otherOkay);
+
+      expect(uut.andThen(() => otherErr)).toBe(otherErr);
+      expect(uut.andThen(() => otherOkay)).toBe(otherOkay);
       expect(
         uut.andThen((value) => Result.okay({ ...value, id: value.id + 1 })),
       ).toEqual(Result.okay({ id: 3, name: "happy" }));
+    });
 
+    test("can be transformed", () => {
       expect(uut.map((value) => value.id + 1)).toEqual(Result.okay(3));
-      expect(uut.mapOr((value) => value.id + 2, otherError)).toEqual(
-        Result.okay(4),
-      );
+
+      expect(uut.mapOr((value) => value.id + 2, 0)).toEqual(Result.okay(4));
+      expect(
+        uut.mapOrElse(
+          (value) => value.id + 3,
+          (_err) => undefined,
+        ),
+      ).toEqual(Result.okay(5));
+
       expect(uut.mapError(() => otherError)).toEqual(uut);
-      expect(uut.safeUnwrap()).toEqual(uutValue);
 
       expect(uut.toMaybe()).toEqual(Maybe.withValue(uutValue));
-      expect(uut.toString()).toEqual('Okay: {"id":2,"name":"happy"}');
 
-      expect(Result.okay(uut)).toEqual(uut);
+      // Re-wrap value
       const wrapToError = Result.error(uut);
-      expect(wrapToError.expectError("unexpected")).toEqual(uutValue);
+      expect(wrapToError.assertIsError("unexpected")).toEqual(uutValue);
+      const singleWrapOkay = Result.okay(uut);
+      expect(singleWrapOkay.assertIsOkay("unexpected")).toEqual(uutValue);
+    });
+
+    test("can be stringified", () => {
+      expect(uut.toString()).toEqual('Okay({"id":2,"name":"happy"})');
     });
 
     test("has void value", () => {
@@ -102,7 +190,7 @@ describe("Result", () => {
       expect(uut.safeUnwrap()).toEqual(undefined);
 
       expect(uut.toMaybe()).toEqual(Maybe.withValue(undefined));
-      expect(uut.toString()).toEqual("Okay: undefined");
+      expect(uut.toString()).toEqual("Okay(undefined)");
     });
 
     test("has iterator with values", () => {
@@ -146,21 +234,24 @@ describe("Result", () => {
       const error2 = new Error("no");
 
       const results = Result.any(Result.error(error1), Result.error(error2));
-      expect(results.expectError("should be error")).toEqual([error1, error2]);
+      expect(results.assertIsError("should be error")).toEqual([
+        error1,
+        error2,
+      ]);
     });
   });
 
   describe("wrap a function", () => {
     test("when the function returns a value", () => {
       const result = Result.wrap(() => 42);
-      expect(result.expectOkay("expected 42")).toBe(42);
+      expect(result.assertIsOkay("expected 42")).toBe(42);
     });
 
     test("when the function throws", () => {
       const result = Result.wrap(() => {
         throw new Error("Boom");
       });
-      expect(result.expectError("expected to throw")).toEqual(
+      expect(result.assertIsError("expected to throw")).toEqual(
         new Error("Boom"),
       );
     });
@@ -182,14 +273,14 @@ describe("Result", () => {
   describe("wrap an async function", () => {
     test("when the function returns a value", async () => {
       const result = await Result.wrapAsync(() => Promise.resolve(42));
-      expect(result.expectOkay("expected 42")).toBe(42);
+      expect(result.assertIsOkay("expected 42")).toBe(42);
     });
 
     test("when the function throws asynchronously", async () => {
       const result = await Result.wrapAsync(async () => {
         throw new Error("Boom");
       });
-      expect(result.expectError("expected to throw")).toEqual(
+      expect(result.assertIsError("expected to throw")).toEqual(
         new Error("Boom"),
       );
     });
@@ -198,16 +289,9 @@ describe("Result", () => {
       const result = await Result.wrapAsync(() => {
         throw new Error("Boom");
       });
-      expect(result.expectError("expected to throw")).toEqual(
+      expect(result.assertIsError("expected to throw")).toEqual(
         new Error("Boom"),
       );
     });
-  });
-
-  test("has type guard", () => {
-    expect(isResult(Result.okay(1))).toBe(true);
-    expect(isResult(Result.error(new Error()))).toBe(true);
-    expect(isResult(1)).toBe(false);
-    expect(isResult(new Error())).toBe(false);
   });
 });
